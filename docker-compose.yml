@@ -1,0 +1,8 @@
+services:
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+    command: ["download", "--server", "en", "--output", "/app/data/raw"]
