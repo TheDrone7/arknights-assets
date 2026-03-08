@@ -1,0 +1,10 @@
+[package]
+name = "arknights-cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ak-downloader = { path = "../crates/downloader" }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+clap = { version = "4.5", features = ["derive"] }
