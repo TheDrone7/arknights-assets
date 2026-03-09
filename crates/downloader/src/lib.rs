@@ -12,7 +12,7 @@ use futures::StreamExt;
 use std::path::Path;
 use tokio::fs;
 
-pub async fn download(server: Server, output_dir: &str) -> Result<()> {
+pub async fn download(server: Server, output_dir: &str, threads: usize) -> Result<()> {
     let base_path = Path::new(output_dir);
     let temp_path = base_path.join(".tmp");
 
@@ -72,7 +72,6 @@ pub async fn download(server: Server, output_dir: &str) -> Result<()> {
 
     let error_logger = errors::ErrorLogger::init(base_path).await?;
 
-    let threads = 4;
     let mut stream = futures::stream::iter(pending)
         .map(|info| {
             let pb = ui.add_download_bar(&info.name);

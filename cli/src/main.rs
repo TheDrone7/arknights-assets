@@ -16,11 +16,29 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Download {
-        #[arg(short, long, default_value = "en")]
+        #[arg(
+            short,
+            long,
+            default_value = "en",
+            help = "The server to download assets from"
+        )]
         server: CliServer,
 
-        #[arg(short, long, default_value = "./data/raw")]
+        #[arg(
+            short,
+            long,
+            default_value = "./data/raw",
+            help = "The directory where the assets should be stored"
+        )]
         output: String,
+
+        #[arg(
+            short,
+            long,
+            default_value_t = 1,
+            help = "The number of files to download concurrently"
+        )]
+        threads: usize,
     },
 }
 
@@ -52,9 +70,13 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Download { server, output } => {
+        Commands::Download {
+            server,
+            output,
+            threads,
+        } => {
             println!("Starting downloader...");
-            download(server.into(), &output).await?;
+            download(server.into(), &output, threads).await?;
             println!("Download completed.");
         }
     }
