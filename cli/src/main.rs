@@ -15,6 +15,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    #[command(about = "Unpack downloaded assets to be processed")]
+    Unpack,
     #[command(about = "Download raw arknights assets from a specific server")]
     Download {
         #[arg(
@@ -99,6 +101,9 @@ async fn main() -> Result<()> {
             } else {
                 download(server.into(), &output, threads, &packs).await?;
             }
+        }
+        Commands::Unpack => {
+            unimplemented!()
         }
     }
 
