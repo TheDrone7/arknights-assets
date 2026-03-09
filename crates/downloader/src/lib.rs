@@ -8,9 +8,15 @@ mod ui;
 pub use server::Server;
 
 use anyhow::{Context, Result};
+use download::stream_download;
+use errors::ErrorLogger;
 use futures::StreamExt;
+use indicatif::HumanBytes;
+use progress::ProgressTracker;
+use reqwest::Client;
 use std::path::Path;
 use tokio::fs;
+use ui::DownloadUi;
 
 pub async fn download(server: Server, output_dir: &str, threads: usize) -> Result<()> {
     let base_path = Path::new(output_dir);
@@ -24,7 +30,7 @@ pub async fn download(server: Server, output_dir: &str, threads: usize) -> Resul
         .await
         .with_context(|| format!("Failed to create temporary directory at {:?}", temp_path))?;
 
-    let client = reqwest::Client::new();
+    let client = Client::new();
     println!("[2/6] Fetching version info for server: '{}'", server);
     let version = client
         .get(server.version_url())
@@ -37,7 +43,7 @@ pub async fn download(server: Server, output_dir: &str, threads: usize) -> Resul
     let version_file = base_path.join("version.json");
     let version_json = serde_json::to_string_pretty(&version)
         .with_context(|| "Failed to stringify version json")?;
-    tokio::fs::write(&version_file, version_json)
+    fs::write(&version_file, version_json)
         .await
         .with_context(|| format!("Failed to store version file at {:?}", version_file))?;
 
@@ -58,8 +64,8 @@ pub async fn download(server: Server, output_dir: &str, threads: usize) -> Resul
     let total_files = update_list.ab_infos.len();
     println!("[4/6] Total files to download: {}", total_files);
 
-    let ui = ui::DownloadUi::new(total_files as u64);
-    let mut tracker = progress::ProgressTracker::load(base_path).await?;
+    let ui = DownloadUi::new(total_files as u64);
+    let mut tracker = ProgressTracker::load(base_path).await?;
     let mut pending = Vec::new();
 
     for info in update_list.ab_infos {
@@ -70,7 +76,7 @@ pub async fn download(server: Server, output_dir: &str, threads: usize) -> Resul
         }
     }
 
-    let error_logger = errors::ErrorLogger::init(base_path).await?;
+    let error_logger = ErrorLogger::init(base_path).await?;
 
     let mut stream = futures::stream::iter(pending)
         .map(|info| {
@@ -81,7 +87,7 @@ pub async fn download(server: Server, output_dir: &str, threads: usize) -> Resul
             let res_version = version.res_version.clone();
 
             async move {
-                let res = download::stream_download(
+                let res = stream_download(
                     &client_ref,
                     &server,
                     &res_version,
@@ -125,6 +131,38 @@ pub async fn download(server: Server, output_dir: &str, threads: usize) -> Resul
     fs::remove_dir_all(&temp_path)
         .await
         .with_context(|| format!("Failed to delete temporary directories: {:?}", &temp_path))?;
+
+    Ok(())
+}
+
+pub async fn list_packs(server: Server) -> Result<()> {
+    let client = Client::new();
+    let version = client
+        .get(server.version_url())
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<models::VersionInfo>()
+        .await?;
+
+    let update_list = client
+        .get(server.hot_update_url(&version.res_version))
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<models::HotUpdateList>()
+        .await?;
+
+    println!(
+        "List of available packs for server: '{}' (version: {})",
+        server, &version.res_version
+    );
+    for pack in update_list.pack_infos {
+        match pack.total_size {
+            Some(size) => println!("- {} ({})", pack.name, HumanBytes(size as u64)),
+            None => println!("- {}", pack.name),
+        };
+    }
 
     Ok(())
 }

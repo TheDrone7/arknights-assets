@@ -1,4 +1,4 @@
-use ak_downloader::{Server, download};
+use ak_downloader::{Server, download, list_packs};
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 
@@ -39,6 +39,14 @@ enum Commands {
             help = "The number of files to download concurrently"
         )]
         threads: usize,
+
+        #[arg(
+            short,
+            long,
+            default_value_t = false,
+            help = "List the available packs from the server instead of downloading files"
+        )]
+        list: bool,
     },
 }
 
@@ -74,10 +82,13 @@ async fn main() -> Result<()> {
             server,
             output,
             threads,
+            list,
         } => {
-            println!("Starting downloader...");
-            download(server.into(), &output, threads).await?;
-            println!("Download completed.");
+            if list {
+                list_packs(server.into()).await?;
+            } else {
+                download(server.into(), &output, threads).await?;
+            }
         }
     }
 
