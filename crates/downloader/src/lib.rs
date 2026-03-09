@@ -1,3 +1,4 @@
+mod errors;
 mod models;
 mod progress;
 mod server;
@@ -70,6 +71,7 @@ pub async fn download(server: Server, output_dir: &str) -> Result<()> {
     }
 
     println!("Pending downloads: {}", pending.len());
+    let _error_logger = errors::ErrorLogger::init(base_path).await?;
 
     // TODO: Implement resumability
     // TODO: Implement streaming downloads
