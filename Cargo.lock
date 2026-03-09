@@ -26,6 +26,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ak-unpacker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
 name = "anstream"
 version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -86,6 +93,7 @@ name = "arknights-cli"
 version = "0.1.0"
 dependencies = [
  "ak-downloader",
+ "ak-unpacker",
  "anyhow",
  "clap",
  "tokio",
@@ -1626,10 +1634,6 @@ name = "unit-prefix"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81e544489bf3d8ef66c953931f56617f423cd4b5494be343d9b9d3dda037b9a3"
-
-[[package]]
-name = "unpacker"
-version = "0.1.0"
 
 [[package]]
 name = "untrusted"

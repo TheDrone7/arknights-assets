@@ -1,14 +1,7 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+use anyhow::Result;
+
+pub fn unpack(input: &str, output: &str) -> Result<()> {
+    println!("Unpacking from {:?} to {:?}", input, output);
+    Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}

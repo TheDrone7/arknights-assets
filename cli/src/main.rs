@@ -1,4 +1,5 @@
 use ak_downloader::{Server, download, list_packs};
+use ak_unpacker::unpack;
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 
@@ -16,7 +17,23 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     #[command(about = "Unpack downloaded assets to be processed")]
-    Unpack,
+    Unpack {
+        #[arg(
+            short,
+            long,
+            default_value = "./data/raw",
+            help = "The directory where the raw assets are stored that need to be unpacked."
+        )]
+        input: String,
+
+        #[arg(
+            short,
+            long,
+            default_value = "./data/unpacked",
+            help = "The directory where the unpacked assets should be stored."
+        )]
+        output: String,
+    },
     #[command(about = "Download raw arknights assets from a specific server")]
     Download {
         #[arg(
@@ -102,8 +119,8 @@ async fn main() -> Result<()> {
                 download(server.into(), &output, threads, &packs).await?;
             }
         }
-        Commands::Unpack => {
-            unimplemented!()
+        Commands::Unpack { input, output } => {
+            unpack(&input, &output)?;
         }
     }
 
