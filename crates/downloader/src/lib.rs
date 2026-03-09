@@ -43,7 +43,22 @@ pub async fn download(server: Server, output_dir: &str) -> Result<()> {
         .with_context(|| format!("Failed to store version file at {:?}", version_file))?;
     println!("Saved version info to {:?}", version_file);
 
-    // TODO: Implement hot update list download and check
+    println!(
+        "Fetching hot update list for server: '{}' and version: '{}'",
+        server, version.res_version
+    );
+
+    let hot_update_url = server.hot_update_url(&version.res_version);
+    let update_list = client
+        .get(&hot_update_url)
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<models::HotUpdateList>()
+        .await?;
+
+    println!("Total files to download: {}", update_list.ab_infos.len());
+
     // TODO: Implement resumability
     // TODO: Implement streaming downloads
     // TODO: Implement error logging
