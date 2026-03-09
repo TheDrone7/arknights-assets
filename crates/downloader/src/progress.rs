@@ -10,7 +10,7 @@ pub struct ProgressTracker {
 
 impl ProgressTracker {
     pub async fn load(base_path: &Path) -> Result<Self> {
-        let progress_file = base_path.join("persist_list.json");
+        let progress_file = base_path.join("downloaded.json");
         let mut completed = HashMap::new();
 
         if progress_file.exists() {
