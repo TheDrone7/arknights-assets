@@ -11,3 +11,29 @@ This is a rewrite for the complete asset-pipeline as used in
 - decoding the text assets
 - combining the images
 - splitting the sprite sheets
+
+---
+
+## Usage
+
+Dependencies
+
+- [Docker engine](https://docs.docker.com/engine/)
+- [Docker compose](https://docs.docker.com/compose/)
+
+```shell
+# Build the image with the CLI
+docker compose build
+
+
+# Then, the CLI can be called using
+docker compose run --rm pipeline --help
+
+
+# For example, the downloader can be run with
+docker compose run --rm pipeline download
+
+
+# Use the help command to learn more about the CLI.
+docker compose run --rm pipeline help download
+```
