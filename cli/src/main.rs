@@ -15,6 +15,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    #[command(about = "Download raw arknights assets from a specific server")]
     Download {
         #[arg(
             short,
@@ -39,6 +40,14 @@ enum Commands {
             help = "The number of files to download concurrently"
         )]
         threads: usize,
+
+        #[arg(
+            short,
+            long,
+            value_delimiter = ',',
+            help = "Filter asset downloads to specific packs. Use --list to see all available packs."
+        )]
+        packs: Vec<String>,
 
         #[arg(
             short,
@@ -82,12 +91,13 @@ async fn main() -> Result<()> {
             server,
             output,
             threads,
+            packs,
             list,
         } => {
             if list {
                 list_packs(server.into()).await?;
             } else {
-                download(server.into(), &output, threads).await?;
+                download(server.into(), &output, threads, &packs).await?;
             }
         }
     }

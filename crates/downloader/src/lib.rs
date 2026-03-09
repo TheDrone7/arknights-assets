@@ -18,7 +18,12 @@ use std::path::Path;
 use tokio::fs;
 use ui::DownloadUi;
 
-pub async fn download(server: Server, output_dir: &str, threads: usize) -> Result<()> {
+pub async fn download(
+    server: Server,
+    output_dir: &str,
+    threads: usize,
+    packs: &[String],
+) -> Result<()> {
     let base_path = Path::new(output_dir);
     let temp_path = base_path.join(".tmp");
 
@@ -61,14 +66,29 @@ pub async fn download(server: Server, output_dir: &str, threads: usize) -> Resul
         .json::<models::HotUpdateList>()
         .await?;
 
-    let total_files = update_list.ab_infos.len();
+    let ab_infos = if packs.is_empty() {
+        update_list.ab_infos
+    } else {
+        update_list
+            .ab_infos
+            .into_iter()
+            .filter(|info| {
+                info.pid
+                    .as_deref()
+                    .map(|p| packs.contains(&p.to_string()))
+                    .unwrap_or(false)
+            })
+            .collect()
+    };
+
+    let total_files = ab_infos.len();
     println!("[4/6] Total files to download: {}", total_files);
 
     let ui = DownloadUi::new(total_files as u64);
     let mut tracker = ProgressTracker::load(base_path).await?;
     let mut pending = Vec::new();
 
-    for info in update_list.ab_infos {
+    for info in ab_infos {
         if !tracker.is_up_to_date(&info.name, &info.md5) {
             pending.push(info);
         } else {
