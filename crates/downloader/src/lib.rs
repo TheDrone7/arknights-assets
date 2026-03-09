@@ -1,10 +1,13 @@
+mod download;
 mod errors;
 mod models;
 mod progress;
 mod server;
 
-use anyhow::{Context, Result};
 pub use server::Server;
+
+use anyhow::{Context, Result};
+use futures::StreamExt;
 use std::path::Path;
 use tokio::fs;
 
@@ -61,20 +64,62 @@ pub async fn download(server: Server, output_dir: &str) -> Result<()> {
 
     println!("Total files to download: {}", update_list.ab_infos.len());
 
-    let metadata = progress::ProgressTracker::load(base_path).await?;
+    let mut tracker = progress::ProgressTracker::load(base_path).await?;
     let mut pending = Vec::new();
 
     for info in update_list.ab_infos {
-        if !metadata.is_up_to_date(&info.name, &info.md5) {
+        if !tracker.is_up_to_date(&info.name, &info.md5) {
             pending.push(info);
         }
     }
 
     println!("Pending downloads: {}", pending.len());
-    let _error_logger = errors::ErrorLogger::init(base_path).await?;
+    let error_logger = errors::ErrorLogger::init(base_path).await?;
 
-    // TODO: Implement resumability
-    // TODO: Implement streaming downloads
-    // TODO: Implement error logging
+    let threads = 4;
+    let mut stream = futures::stream::iter(pending)
+        .map(|info| {
+            let temp_file = temp_path.join(&info.name);
+            let final_file = base_path.join(&info.name);
+            let client_ref = client.clone();
+            let res_version = version.res_version.clone();
+
+            async move {
+                let res = download::stream_download(
+                    &client_ref,
+                    &server,
+                    &res_version,
+                    &info.name,
+                    &temp_file,
+                    &final_file,
+                )
+                .await;
+                (info, res)
+            }
+        })
+        .buffer_unordered(threads);
+
+    while let Some((info, result)) = stream.next().await {
+        match result {
+            Ok(_) => {
+                println!("Successfully downloaded: {:?}", &info.name);
+                tracker.mark_completed(info.name, info.md5).await?;
+            }
+            Err(e) => {
+                println!("Failed to download: {:?}", &info.name);
+                error_logger
+                    .log_error(format!("{}: {:?}", &info.name, e))
+                    .await;
+            }
+        }
+    }
+
+    if error_logger.has_errors().await {
+        println!(
+            "Encountered some errors, logged to file: {:?}",
+            error_logger.path()
+        );
+    }
+
     Ok(())
 }
