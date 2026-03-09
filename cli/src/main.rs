@@ -1,6 +1,6 @@
-use ak_downloader::download;
+use ak_downloader::{Server, download};
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 #[command(
@@ -17,21 +17,44 @@ struct Cli {
 enum Commands {
     Download {
         #[arg(short, long, default_value = "en")]
-        server: String,
+        server: CliServer,
 
         #[arg(short, long, default_value = "./data/raw")]
         output: String,
     },
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum CliServer {
+    En,
+    Cn,
+    Bl,
+    Jp,
+    Kr,
+    Tw,
+}
+
+impl From<CliServer> for Server {
+    fn from(cli_server: CliServer) -> Self {
+        match cli_server {
+            CliServer::En => Server::En,
+            CliServer::Cn => Server::Cn,
+            CliServer::Bl => Server::Bl,
+            CliServer::Jp => Server::Jp,
+            CliServer::Kr => Server::Kr,
+            CliServer::Tw => Server::Tw,
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    match &cli.command {
+    match cli.command {
         Commands::Download { server, output } => {
             println!("Starting downloader...");
-            download(server, output).await?;
+            download(server.into(), &output).await?;
             println!("Download completed.");
         }
     }
