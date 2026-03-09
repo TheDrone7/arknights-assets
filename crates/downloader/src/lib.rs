@@ -1,4 +1,5 @@
 mod models;
+mod progress;
 mod server;
 
 use anyhow::{Context, Result};
@@ -58,6 +59,17 @@ pub async fn download(server: Server, output_dir: &str) -> Result<()> {
         .await?;
 
     println!("Total files to download: {}", update_list.ab_infos.len());
+
+    let metadata = progress::ProgressTracker::load(base_path).await?;
+    let mut pending = Vec::new();
+
+    for info in update_list.ab_infos {
+        if !metadata.is_up_to_date(&info.name, &info.md5) {
+            pending.push(info);
+        }
+    }
+
+    println!("Pending downloads: {}", pending.len());
 
     // TODO: Implement resumability
     // TODO: Implement streaming downloads
