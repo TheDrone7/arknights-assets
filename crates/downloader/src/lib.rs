@@ -3,6 +3,7 @@ mod errors;
 mod models;
 mod progress;
 mod server;
+mod ui;
 
 pub use server::Server;
 
@@ -15,21 +16,16 @@ pub async fn download(server: Server, output_dir: &str) -> Result<()> {
     let base_path = Path::new(output_dir);
     let temp_path = base_path.join(".tmp");
 
+    println!("[1/6] Preparing output and temporary directories.");
     fs::create_dir_all(&base_path)
         .await
         .with_context(|| format!("Failed to create output directory at {:?}", base_path))?;
-    println!("Output directory ready: {:?}", base_path);
-
     fs::create_dir_all(&temp_path)
         .await
         .with_context(|| format!("Failed to create temporary directory at {:?}", temp_path))?;
-    println!("Temporary directory ready: {:?}", temp_path);
-
-    println!("Initializing download from server: '{}'", server);
 
     let client = reqwest::Client::new();
-    println!("Fetching version info for server: '{}'", server);
-
+    println!("[2/6] Fetching version info for server: '{}'", server);
     let version = client
         .get(server.version_url())
         .send()
@@ -38,18 +34,15 @@ pub async fn download(server: Server, output_dir: &str) -> Result<()> {
         .json::<models::VersionInfo>()
         .await?;
 
-    println!("Received version: {}", version.res_version);
-
     let version_file = base_path.join("version.json");
     let version_json = serde_json::to_string_pretty(&version)
         .with_context(|| "Failed to stringify version json")?;
     tokio::fs::write(&version_file, version_json)
         .await
         .with_context(|| format!("Failed to store version file at {:?}", version_file))?;
-    println!("Saved version info to {:?}", version_file);
 
     println!(
-        "Fetching hot update list for server: '{}' and version: '{}'",
+        "[3/6] Fetching hot update list for server: '{}' and version: '{}'",
         server, version.res_version
     );
 
@@ -62,23 +55,27 @@ pub async fn download(server: Server, output_dir: &str) -> Result<()> {
         .json::<models::HotUpdateList>()
         .await?;
 
-    println!("Total files to download: {}", update_list.ab_infos.len());
+    let total_files = update_list.ab_infos.len();
+    println!("[4/6] Total files to download: {}", total_files);
 
+    let ui = ui::DownloadUi::new(total_files as u64);
     let mut tracker = progress::ProgressTracker::load(base_path).await?;
     let mut pending = Vec::new();
 
     for info in update_list.ab_infos {
         if !tracker.is_up_to_date(&info.name, &info.md5) {
             pending.push(info);
+        } else {
+            ui.inc_main();
         }
     }
 
-    println!("Pending downloads: {}", pending.len());
     let error_logger = errors::ErrorLogger::init(base_path).await?;
 
     let threads = 4;
     let mut stream = futures::stream::iter(pending)
         .map(|info| {
+            let pb = ui.add_download_bar(&info.name);
             let temp_file = temp_path.join(&info.name);
             let final_file = base_path.join(&info.name);
             let client_ref = client.clone();
@@ -94,6 +91,7 @@ pub async fn download(server: Server, output_dir: &str) -> Result<()> {
                     &final_file,
                 )
                 .await;
+                pb.finish_and_clear();
                 (info, res)
             }
         })
@@ -102,24 +100,32 @@ pub async fn download(server: Server, output_dir: &str) -> Result<()> {
     while let Some((info, result)) = stream.next().await {
         match result {
             Ok(_) => {
-                println!("Successfully downloaded: {:?}", &info.name);
                 tracker.mark_completed(info.name, info.md5).await?;
             }
             Err(e) => {
-                println!("Failed to download: {:?}", &info.name);
                 error_logger
                     .log_error(format!("{}: {:?}", &info.name, e))
                     .await;
             }
         }
+        ui.inc_main();
     }
+
+    ui.finish();
 
     if error_logger.has_errors().await {
         println!(
-            "Encountered some errors, logged to file: {:?}",
+            "[5/6] Finished with errors. Check log: {:?}",
             error_logger.path()
         );
+    } else {
+        println!("[5/6] Successfully finished downloading assets.");
     }
+
+    println!("[6/6] Cleaning up temporary directories.");
+    fs::remove_dir_all(&temp_path)
+        .await
+        .with_context(|| format!("Failed to delete temporary directories: {:?}", &temp_path))?;
 
     Ok(())
 }

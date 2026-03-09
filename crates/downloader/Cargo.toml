@@ -11,3 +11,4 @@ regex = "1.12"
 anyhow = { workspace = true }
 tokio = { workspace = true, features = ["fs", "io-util"] }
 futures = { workspace = true }
+indicatif = { workspace = true }
