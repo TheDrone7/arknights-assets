@@ -2,9 +2,7 @@ mod block;
 mod header;
 
 use anyhow::Result;
-use std::fs::File;
-use std::io::{BufRead, BufReader, Write};
-use std::path::Path;
+use std::io::{BufRead, Seek, Write};
 
 use block::BlockInfo;
 use header::BundleHeader;
@@ -15,24 +13,19 @@ pub struct UnityBundle {
 }
 
 impl UnityBundle {
-    pub fn parse(path: &Path, log: &mut impl Write) -> Result<Self> {
-        let mut reader = BufReader::new(File::open(path)?);
-        let header = match BundleHeader::parse(&mut reader) {
-            Ok(h) => h,
-            Err(e) => {
-                writeln!(log, "SKIP [bad header] | [{}]: {}", path.display(), e)?;
-                return Err(e);
-            }
-        };
-        let info = match BlockInfo::parse(&mut reader, &header) {
-            Ok(i) => i,
-            Err(e) => {
-                writeln!(log, "SKIP [bad block info] | [{}]: {}", path.display(), e)?;
-                return Err(e);
-            }
-        };
+    pub fn parse(reader: &mut (impl BufRead + Seek)) -> Result<Self> {
+        let header = BundleHeader::parse(reader)?;
+        let info = BlockInfo::parse(reader, &header)?;
 
         Ok(Self { header, info })
+    }
+
+    pub fn decompress(
+        &self,
+        reader: &mut (impl BufRead + Seek),
+        output: &mut impl Write,
+    ) -> Result<usize> {
+        self.info.decompress(reader, output, &self.header)
     }
 }
 

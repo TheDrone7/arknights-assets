@@ -1,9 +1,10 @@
 pub mod bundle;
 mod extract;
+mod lz4inv;
 
 use anyhow::Result;
-use std::fs::{OpenOptions, create_dir_all, read_dir, remove_dir_all};
-use std::io::{BufWriter, Write};
+use std::fs::{File, OpenOptions, create_dir_all, read_dir, remove_dir_all};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 pub fn unpack(input: &str, output: &str) -> Result<()> {
@@ -71,16 +72,40 @@ fn parse_all(input: &Path, log: &mut impl Write) -> Result<()> {
 }
 
 fn parse_bundle(path: &Path, log: &mut impl Write) -> Result<()> {
-    let bundle = match bundle::UnityBundle::parse(path, log) {
+    let mut reader = BufReader::new(File::open(path)?);
+    let bundle = match bundle::UnityBundle::parse(&mut reader) {
         Ok(b) => b,
-        Err(_) => return Ok(()),
+        Err(e) => {
+            writeln!(log, "SKIP [bad asset bundle] | [{}]: {}", path.display(), e)?;
+            return Ok(());
+        }
     };
-
     println!(
-        "File: {}\n  blocks={}; nodes={}\n",
+        "File: {}\n  blocks={}; nodes={}",
         path.display(),
         bundle.info.blocks.len(),
         bundle.info.nodes.len()
+    );
+
+    let dec_path = path.with_extension("dec");
+    let dec_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&dec_path)?;
+    let mut dec_writer = BufWriter::new(dec_file);
+    let bytes_size = match bundle.decompress(&mut reader, &mut dec_writer) {
+        Ok(size) => size,
+        Err(e) => {
+            writeln!(log, "SKIP [bad compression] | [{}]: {}", path.display(), e)?;
+            return Ok(());
+        }
+    };
+    dec_writer.flush()?;
+    println!(
+        "Decompressed file: {} (size: {})\n",
+        dec_path.display(),
+        bytes_size
     );
 
     Ok(())

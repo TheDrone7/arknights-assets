@@ -15,7 +15,7 @@ impl BundleHeader {
     pub fn parse(reader: &mut impl BufRead) -> Result<Self> {
         let signature = super::read_cstring(reader)?;
         if signature != "UnityFS" {
-            bail!("Not a UnityFS bundle, got '{:?}'", signature);
+            bail!("Not a UnityFS bundle, got '{}'", signature);
         }
 
         Ok(Self {

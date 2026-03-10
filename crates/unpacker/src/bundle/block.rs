@@ -1,7 +1,8 @@
-use anyhow::Result;
-use std::io::{BufRead, Cursor, Seek, SeekFrom};
+use anyhow::{Result, bail};
+use std::io::{BufRead, Cursor, Seek, SeekFrom, Write};
 
 use super::header::BundleHeader;
+use crate::lz4inv;
 
 pub struct StorageBlock {
     pub decompressed_size: u32,
@@ -71,5 +72,46 @@ impl BlockInfo {
         }
 
         Ok(BlockInfo { blocks, nodes })
+    }
+
+    pub fn decompress(
+        &self,
+        reader: &mut (impl BufRead + Seek),
+        output: &mut impl Write,
+        header: &BundleHeader,
+    ) -> Result<usize> {
+        if header.flags & 0x200 != 0 {
+            let pos = reader.stream_position()?;
+            let aligned = (pos + 15) & !15;
+            if aligned > pos {
+                reader.seek(SeekFrom::Start(aligned))?;
+            }
+        }
+        let mut total_decompressed = 0;
+
+        for storage_block in &self.blocks {
+            let mut buf = vec![0u8; storage_block.compressed_size as usize];
+            reader.read_exact(&mut buf)?;
+
+            match storage_block.flags & 0x3F {
+                0 => {
+                    output.write_all(&buf)?;
+                    total_decompressed += buf.len();
+                }
+                2 | 3 => {
+                    let dec = lz4_flex::decompress(&buf, storage_block.decompressed_size as usize)?;
+                    output.write_all(&dec)?;
+                    total_decompressed += dec.len();
+                }
+                4 => {
+                    let dec = lz4inv::decompress(&buf, storage_block.decompressed_size as usize)?;
+                    output.write_all(&dec)?;
+                    total_decompressed += dec.len();
+                }
+                t => bail!("unsupported block compression type: {}", t),
+            };
+        }
+
+        Ok(total_decompressed)
     }
 }
