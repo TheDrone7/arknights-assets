@@ -86,6 +86,12 @@ pub fn i64_le(reader: &mut impl BufRead) -> Result<i64> {
     Ok(i64::from_le_bytes(buf))
 }
 
+pub fn f32_le(reader: &mut impl BufRead) -> Result<f32> {
+    let mut buf = [0u8; 4];
+    reader.read_exact(&mut buf)?;
+    Ok(f32::from_le_bytes(buf))
+}
+
 pub fn align4(reader: &mut (impl BufRead + Seek), base: u64) -> Result<()> {
     let pos = reader.stream_position()? - base;
     let aligned = (pos + 3) & !3;
@@ -100,12 +106,7 @@ pub fn aligned_bytes(reader: &mut (impl BufRead + Seek)) -> Result<Vec<u8>> {
     let len = u32_le(reader)? as usize;
     let mut buf = vec![0u8; len];
     reader.read_exact(&mut buf)?;
-
-    let pos = reader.stream_position()?;
-    let aligned = (pos + 3) & !3;
-    if aligned > pos {
-        reader.seek(SeekFrom::Start(aligned))?;
-    }
+    align4(reader, 0)?;
 
     Ok(buf)
 }
