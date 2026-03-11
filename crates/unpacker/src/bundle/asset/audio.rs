@@ -31,11 +31,9 @@ impl AudioClip {
         let channels = i32_le(reader)?;
         let frequency = i32_le(reader)?;
         let _bits_per_sample = i32_le(reader)?;
-
         let length = f32_le(reader)?;
         let _is_tracker_format = byte(reader)?;
         align4(reader, 0)?;
-
         let _sound_index = i32_le(reader)?;
         let _preload_audio_data = byte(reader)?;
         let _load_in_background = byte(reader)?;
