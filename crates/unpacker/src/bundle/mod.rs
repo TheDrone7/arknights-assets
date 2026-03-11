@@ -2,6 +2,7 @@ mod block;
 mod header;
 mod serialized;
 
+pub mod asset;
 pub mod read;
 
 use anyhow::Result;

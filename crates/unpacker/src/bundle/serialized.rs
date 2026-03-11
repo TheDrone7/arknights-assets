@@ -134,16 +134,6 @@ impl SerializedFile {
     }
 }
 
-fn align4(reader: &mut (impl BufRead + Seek), base: u64) -> Result<()> {
-    let pos = reader.stream_position()? - base;
-    let aligned = (pos + 3) & !3;
-    if aligned > pos {
-        reader.seek(SeekFrom::Current((aligned - pos) as i64))?;
-    }
-
-    Ok(())
-}
-
 fn read_endian(reader: &mut impl BufRead) -> Result<u8> {
     let mut buf = [0u8; 4];
     reader.read_exact(&mut buf)?;

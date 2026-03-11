@@ -3,6 +3,8 @@ mod extract;
 mod lz4inv;
 
 use anyhow::Result;
+use bundle::{UnityBundle, asset::TextAsset};
+
 use std::fs::{File, OpenOptions, create_dir_all, read_dir, remove_dir_all};
 use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -73,7 +75,7 @@ fn parse_all(input: &Path, log: &mut impl Write) -> Result<()> {
 
 fn parse_bundle(path: &Path, log: &mut impl Write) -> Result<()> {
     let mut reader = BufReader::new(File::open(path)?);
-    let bundle = match bundle::UnityBundle::parse(&mut reader) {
+    let bundle = match UnityBundle::parse(&mut reader) {
         Ok(b) => b,
         Err(e) => {
             writeln!(log, "SKIP [bad asset bundle] | [{}]: {}", path.display(), e)?;
@@ -114,10 +116,11 @@ fn parse_bundle(path: &Path, log: &mut impl Write) -> Result<()> {
         );
 
         for obj in sf.objects {
-            println!(
-                "    - path: {}; class: {}, size: {}B",
-                obj.path_id, obj.class_id, obj.byte_size
-            );
+            if obj.class_id == 49 {
+                let abs = sf.data_offset + obj.byte_start;
+                let ta = TextAsset::parse(&mut dec_reader, abs as u64)?;
+                println!("    - TextAsset [{}]: {}B", ta.name, ta.data.len())
+            }
         }
     }
 

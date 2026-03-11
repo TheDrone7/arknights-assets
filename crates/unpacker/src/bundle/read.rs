@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::io::BufRead;
+use std::io::{BufRead, Seek, SeekFrom};
 
 pub fn cstring(reader: &mut impl BufRead) -> Result<String> {
     let mut buf = Vec::new();
@@ -84,4 +84,28 @@ pub fn i64_le(reader: &mut impl BufRead) -> Result<i64> {
     let mut buf = [0u8; 8];
     reader.read_exact(&mut buf)?;
     Ok(i64::from_le_bytes(buf))
+}
+
+pub fn align4(reader: &mut (impl BufRead + Seek), base: u64) -> Result<()> {
+    let pos = reader.stream_position()? - base;
+    let aligned = (pos + 3) & !3;
+    if aligned > pos {
+        reader.seek(SeekFrom::Current((aligned - pos) as i64))?;
+    }
+
+    Ok(())
+}
+
+pub fn aligned_bytes(reader: &mut (impl BufRead + Seek)) -> Result<Vec<u8>> {
+    let len = u32_le(reader)? as usize;
+    let mut buf = vec![0u8; len];
+    reader.read_exact(&mut buf)?;
+
+    let pos = reader.stream_position()?;
+    let aligned = (pos + 3) & !3;
+    if aligned > pos {
+        reader.seek(SeekFrom::Start(aligned))?;
+    }
+
+    Ok(buf)
 }
