@@ -98,7 +98,7 @@ fn parse_bundle(path: &Path, log: &mut impl Write) -> Result<()> {
         Ok(size) => size,
         Err(e) => {
             writeln!(log, "SKIP [bad compression] | [{}]: {}", path.display(), e)?;
-            return Ok(());
+            return Err(e);
         }
     };
     dec_writer.flush()?;
@@ -107,9 +107,18 @@ fn parse_bundle(path: &Path, log: &mut impl Write) -> Result<()> {
     let mut dec_reader = BufReader::new(File::open(&dec_path)?);
     for sf in bundle.get_serialized(&mut dec_reader)? {
         println!(
-            "  - {}:: version: {}; endian: {}, offset: {}, metadata_size: {}; file_size: {}",
-            sf.name, sf.version, sf.endianness, sf.data_offset, sf.metadata_size, sf.file_size
+            "  - {}:: v{}; {} objects",
+            sf.name,
+            sf.version,
+            sf.objects.len()
         );
+
+        for obj in sf.objects {
+            println!(
+                "    - path: {}; class: {}, size: {}B",
+                obj.path_id, obj.class_id, obj.byte_size
+            );
+        }
     }
 
     println!("\n");

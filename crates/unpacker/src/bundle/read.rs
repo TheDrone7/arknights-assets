@@ -8,6 +8,12 @@ pub fn cstring(reader: &mut impl BufRead) -> Result<String> {
     Ok(String::from_utf8(buf)?)
 }
 
+pub fn byte(reader: &mut impl BufRead) -> Result<u8> {
+    let mut buf = [0u8; 1];
+    reader.read_exact(&mut buf)?;
+    Ok(buf[0])
+}
+
 pub fn u16_be(reader: &mut impl BufRead) -> Result<u16> {
     let mut buf = [0u8; 2];
     reader.read_exact(&mut buf)?;
@@ -42,6 +48,30 @@ pub fn u64_le(reader: &mut impl BufRead) -> Result<u64> {
     let mut buf = [0u8; 8];
     reader.read_exact(&mut buf)?;
     Ok(u64::from_le_bytes(buf))
+}
+
+pub fn i16_be(reader: &mut impl BufRead) -> Result<i16> {
+    let mut buf = [0u8; 2];
+    reader.read_exact(&mut buf)?;
+    Ok(i16::from_be_bytes(buf))
+}
+
+pub fn i16_le(reader: &mut impl BufRead) -> Result<i16> {
+    let mut buf = [0u8; 2];
+    reader.read_exact(&mut buf)?;
+    Ok(i16::from_le_bytes(buf))
+}
+
+pub fn i32_be(reader: &mut impl BufRead) -> Result<i32> {
+    let mut buf = [0u8; 4];
+    reader.read_exact(&mut buf)?;
+    Ok(i32::from_be_bytes(buf))
+}
+
+pub fn i32_le(reader: &mut impl BufRead) -> Result<i32> {
+    let mut buf = [0u8; 4];
+    reader.read_exact(&mut buf)?;
+    Ok(i32::from_le_bytes(buf))
 }
 
 pub fn i64_be(reader: &mut impl BufRead) -> Result<i64> {
