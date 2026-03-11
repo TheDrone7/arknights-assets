@@ -2,6 +2,7 @@ use anyhow::{Result, bail};
 use std::io::{BufRead, Cursor, Seek, SeekFrom, Write};
 
 use super::header::BundleHeader;
+use super::read::*;
 use crate::lz4inv;
 
 pub struct StorageBlock {
@@ -43,12 +44,12 @@ impl BlockInfo {
         let mut cur = Cursor::new(decompressed);
         cur.seek(SeekFrom::Current(16))?;
 
-        let block_count = super::read::u32_be(&mut cur)?;
+        let block_count = u32_be(&mut cur)?;
         let mut blocks = Vec::new();
         for _ in 0..block_count {
-            let decompressed_size = super::read::u32_be(&mut cur)?;
-            let compressed_size = super::read::u32_be(&mut cur)?;
-            let flags = super::read::u16_be(&mut cur)?;
+            let decompressed_size = u32_be(&mut cur)?;
+            let compressed_size = u32_be(&mut cur)?;
+            let flags = u16_be(&mut cur)?;
             blocks.push(StorageBlock {
                 decompressed_size,
                 compressed_size,
@@ -56,13 +57,13 @@ impl BlockInfo {
             });
         }
 
-        let node_count = super::read::u32_be(&mut cur)?;
+        let node_count = u32_be(&mut cur)?;
         let mut nodes = Vec::new();
         for _ in 0..node_count {
-            let offset = super::read::u64_be(&mut cur)?;
-            let size = super::read::u64_be(&mut cur)?;
-            let flags = super::read::u32_be(&mut cur)?;
-            let name = super::read::cstring(&mut cur)?;
+            let offset = u64_be(&mut cur)?;
+            let size = u64_be(&mut cur)?;
+            let flags = u32_be(&mut cur)?;
+            let name = cstring(&mut cur)?;
             nodes.push(DirectoryNode {
                 offset,
                 size,
