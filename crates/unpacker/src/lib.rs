@@ -3,10 +3,10 @@ mod extract;
 mod lz4inv;
 
 use anyhow::Result;
-use bundle::{UnityBundle, asset::TextAsset};
+use bundle::UnityBundle;
 
-use std::fs::{File, OpenOptions, create_dir_all, read_dir, remove_dir_all};
-use std::io::{BufReader, BufWriter, Write};
+use std::fs::{OpenOptions, create_dir_all, read_dir, remove_dir_all};
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 pub fn unpack(input: &str, output: &str) -> Result<()> {
@@ -74,57 +74,9 @@ fn parse_all(input: &Path, log: &mut impl Write) -> Result<()> {
 }
 
 fn parse_bundle(path: &Path, log: &mut impl Write) -> Result<()> {
-    let mut reader = BufReader::new(File::open(path)?);
-    let bundle = match UnityBundle::parse(&mut reader) {
-        Ok(b) => b,
-        Err(e) => {
-            writeln!(log, "SKIP [bad asset bundle] | [{}]: {}", path.display(), e)?;
-            return Ok(());
-        }
-    };
-    println!(
-        "File: {}\n  blocks={}; nodes={}",
-        path.display(),
-        bundle.info.blocks.len(),
-        bundle.info.nodes.len()
-    );
-
-    let dec_path = path.with_extension("dec");
-    let dec_file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&dec_path)?;
-    let mut dec_writer = BufWriter::new(dec_file);
-    let bytes_size = match bundle.decompress(&mut reader, &mut dec_writer) {
-        Ok(size) => size,
-        Err(e) => {
-            writeln!(log, "SKIP [bad compression] | [{}]: {}", path.display(), e)?;
-            return Err(e);
-        }
-    };
-    dec_writer.flush()?;
-    println!("  dec: {} (size: {}B)", dec_path.display(), bytes_size);
-
-    let mut dec_reader = BufReader::new(File::open(&dec_path)?);
-    for sf in bundle.get_serialized(&mut dec_reader)? {
-        println!(
-            "  - {}:: v{}; {} objects",
-            sf.name,
-            sf.version,
-            sf.objects.len()
-        );
-
-        for obj in sf.objects {
-            if obj.class_id == 49 {
-                let abs = sf.data_offset + obj.byte_start;
-                let ta = TextAsset::parse(&mut dec_reader, abs as u64)?;
-                println!("    - TextAsset [{}]: {}B", ta.name, ta.data.len())
-            }
-        }
+    if let Err(e) = UnityBundle::process(path) {
+        writeln!(log, "{}", e)?;
+        return Ok(());
     }
-
-    println!("\n");
-
     Ok(())
 }

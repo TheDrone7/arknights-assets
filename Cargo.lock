@@ -47,6 +47,7 @@ name = "ak-unpacker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "indicatif",
  "lz4_flex",
  "zip",
 ]

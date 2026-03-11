@@ -12,6 +12,7 @@ pub struct ObjectData {
 
 pub struct SerializedFile {
     pub name: String,
+    pub node_offset: u64,
     pub metadata_size: u32,
     pub file_size: i64,
     pub version: u32,
@@ -28,6 +29,7 @@ impl SerializedFile {
         _size: u64,
     ) -> Result<Self> {
         let name = name.to_string();
+        let node_offset = offset;
         let objects = Vec::new();
 
         reader.seek(SeekFrom::Start(offset))?;
@@ -38,6 +40,7 @@ impl SerializedFile {
         if version < 9 {
             return Ok(Self {
                 name,
+                node_offset,
                 metadata_size,
                 file_size,
                 version,
@@ -51,6 +54,7 @@ impl SerializedFile {
         if version < 22 {
             return Ok(Self {
                 name,
+                node_offset,
                 metadata_size,
                 file_size,
                 version,
@@ -69,6 +73,7 @@ impl SerializedFile {
 
         Ok(Self {
             name,
+            node_offset,
             metadata_size,
             file_size,
             version,
