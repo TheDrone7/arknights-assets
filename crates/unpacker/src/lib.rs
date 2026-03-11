@@ -102,11 +102,17 @@ fn parse_bundle(path: &Path, log: &mut impl Write) -> Result<()> {
         }
     };
     dec_writer.flush()?;
-    println!(
-        "Decompressed file: {} (size: {})\n",
-        dec_path.display(),
-        bytes_size
-    );
+    println!("  dec: {} (size: {}B)", dec_path.display(), bytes_size);
+
+    let mut dec_reader = BufReader::new(File::open(&dec_path)?);
+    for sf in bundle.get_serialized(&mut dec_reader)? {
+        println!(
+            "  - {}:: version: {}; endian: {}, offset: {}, metadata_size: {}; file_size: {}",
+            sf.name, sf.version, sf.endianness, sf.data_offset, sf.metadata_size, sf.file_size
+        );
+    }
+
+    println!("\n");
 
     Ok(())
 }

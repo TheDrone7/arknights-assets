@@ -1,12 +1,15 @@
 mod block;
 mod header;
-mod read;
+mod serialized;
+
+pub mod read;
 
 use anyhow::Result;
 use std::io::{BufRead, Seek, Write};
 
 use block::BlockInfo;
 use header::BundleHeader;
+use serialized::SerializedFile;
 
 pub struct UnityBundle {
     pub header: BundleHeader,
@@ -27,5 +30,25 @@ impl UnityBundle {
         output: &mut impl Write,
     ) -> Result<usize> {
         self.info.decompress(reader, output, &self.header)
+    }
+
+    pub fn get_serialized(
+        &self,
+        reader: &mut (impl BufRead + Seek),
+    ) -> Result<Vec<SerializedFile>> {
+        let mut out = Vec::new();
+
+        for node in &self.info.nodes {
+            if !node.name.contains('.') {
+                out.push(SerializedFile::parse(
+                    &node.name,
+                    reader,
+                    node.offset,
+                    node.size,
+                )?);
+            }
+        }
+
+        Ok(out)
     }
 }
