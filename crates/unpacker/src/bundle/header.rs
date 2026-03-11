@@ -13,19 +13,19 @@ pub struct BundleHeader {
 
 impl BundleHeader {
     pub fn parse(reader: &mut impl BufRead) -> Result<Self> {
-        let signature = super::read_cstring(reader)?;
+        let signature = super::read::cstring(reader)?;
         if signature != "UnityFS" {
             bail!("Not a UnityFS bundle, got '{}'", signature);
         }
 
         Ok(Self {
-            format_version: super::read_u32(reader)?,
-            unity_version_min: super::read_cstring(reader)?,
-            unity_version_built: super::read_cstring(reader)?,
-            file_size: super::read_i64(reader)?,
-            compressed_blocks_size: super::read_u32(reader)?,
-            decompressed_blocks_size: super::read_u32(reader)?,
-            flags: super::read_u32(reader)?,
+            format_version: super::read::u32_be(reader)?,
+            unity_version_min: super::read::cstring(reader)?,
+            unity_version_built: super::read::cstring(reader)?,
+            file_size: super::read::i64_be(reader)?,
+            compressed_blocks_size: super::read::u32_be(reader)?,
+            decompressed_blocks_size: super::read::u32_be(reader)?,
+            flags: super::read::u32_be(reader)?,
         })
     }
 }
