@@ -6,12 +6,11 @@ pub mod asset;
 pub mod read;
 
 use anyhow::{Context, Result};
-use indicatif::HumanBytes;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
 use std::path::Path;
 
-use asset::{AudioClip, AudioData, MonoBehaviour, Sprite, TextAsset, Texture2D};
+use asset::{AudioClip, AudioData, ImageData, MonoBehaviour, Sprite, TextAsset, Texture2D};
 use block::BlockInfo;
 use header::BundleHeader;
 use serialized::SerializedFile;
@@ -104,62 +103,40 @@ impl UnityBundle {
                 let abs = sf.node_offset + (sf.data_offset + obj.byte_start) as u64;
                 match obj.class_id {
                     28 => {
-                        let _texture =
-                            Texture2D::parse(&mut dec_reader, abs).with_context(|| {
+                        let texture = Texture2D::parse(obj.unity_version, &mut dec_reader, abs)
+                            .with_context(|| {
                                 format!("Texture2D :: path_id = {}; abs = {}", obj.path_id, abs)
                             })?;
-                        // match texture.image {
-                        //    ImageData::Inline(data) => {
-                        //        println!(
-                        //            "    TEXTURE2D: [{}] ({}x{} | {})",
-                        //            texture.name,
-                        //            texture.width,
-                        //            texture.height,
-                        //            HumanBytes(data.len() as u64)
-                        //        );
-                        //    }
-                        //    ImageData::Streaming { path, offset, size } => {
-                        //        println!(
-                        //            "    TEXTURE2D: [{}] ({}x{} | {}@{}+{})",
-                        //            texture.name, texture.width, texture.height, path, offset, size
-                        //        );
-                        //    }
-                        // }
+                        let ress_base = if let ImageData::Streaming { path: p, .. } = &texture.image
+                        {
+                            let name = Path::new(p)
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or(p.as_str());
+                            bundle
+                                .info
+                                .nodes
+                                .iter()
+                                .find(|n| n.name == name)
+                                .map(|n| n.offset)
+                        } else {
+                            None
+                        };
+                        texture
+                            .extract(&out_dir, &dec_path, ress_base)
+                            .with_context(|| format!("Texture2D::extract '{}'", &texture.name))?;
                     }
                     49 => {
                         let text = TextAsset::parse(&mut dec_reader, abs).with_context(|| {
                             format!("TextAsset :: path_id = {}; abs = {}", obj.path_id, abs)
                         })?;
-                        text.extract(&out_dir)?;
+                        text.extract(&out_dir)
+                            .with_context(|| format!("TextAsset::extract '{}'", &text.name))?;
                     }
                     83 => {
                         let audio = AudioClip::parse(&mut dec_reader, abs).with_context(|| {
                             format!("AudioClip :: path_id = {}; abs = {}", obj.path_id, abs)
                         })?;
-                        match &audio.audio {
-                            AudioData::Inline(data) => {
-                                println!(
-                                    "    AUDIO: [{}] ({}ch; {}Hz; {}s | {})",
-                                    audio.name,
-                                    audio.channels,
-                                    audio.frequency,
-                                    audio.length,
-                                    HumanBytes(data.len() as u64)
-                                );
-                            }
-                            AudioData::Streaming { path, offset, size } => {
-                                println!(
-                                    "    AUDIO: [{}] ({}ch; {}Hz; {}s | {}@{}+{}",
-                                    audio.name,
-                                    audio.channels,
-                                    audio.frequency,
-                                    audio.length,
-                                    path,
-                                    offset,
-                                    size
-                                );
-                            }
-                        }
                         let ress_base = if let AudioData::Streaming { path: p, .. } = &audio.audio {
                             let name = Path::new(&p)
                                 .file_name()

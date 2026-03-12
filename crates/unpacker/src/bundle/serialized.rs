@@ -4,6 +4,7 @@ use std::io::{BufRead, Seek, SeekFrom};
 use super::read::*;
 
 pub struct ObjectData {
+    pub unity_version: (u32, u32),
     pub path_id: i64,
     pub byte_start: i64,
     pub byte_size: u32,
@@ -87,7 +88,13 @@ impl SerializedFile {
         let mut out = Vec::new();
         let base_pos = reader.stream_position()?;
 
-        let _unity_ver = cstring(reader)?;
+        let unity_ver = cstring(reader)?;
+        let unity_ver: Vec<u32> = unity_ver
+            .split('.')
+            .take(2)
+            .flat_map(|v| v.parse::<u32>())
+            .collect();
+        let unity_version = (unity_ver[0], unity_ver[1]);
         let _target_platform = i32_le(reader)?;
         let enable_type_tree = byte(reader)? != 0;
 
@@ -128,6 +135,7 @@ impl SerializedFile {
                 .to_owned();
 
             out.push(ObjectData {
+                unity_version,
                 path_id,
                 byte_start,
                 byte_size,

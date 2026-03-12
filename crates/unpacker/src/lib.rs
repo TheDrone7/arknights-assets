@@ -29,7 +29,7 @@ pub fn unpack(input: &str, output: &str) -> Result<()> {
     extract::all(Path::new(input), &tmp_path, &mut log)?;
 
     println!("[2/3] Parsing unity bundles...");
-    parse_all(&tmp_path, &mut log)?;
+    parse_all(&tmp_path, out_path, &mut log)?;
 
     remove_dir_all(&tmp_path)?;
     log.flush()?;
@@ -61,11 +61,11 @@ fn scan_files(root: &Path) -> impl Iterator<Item = Result<PathBuf>> {
     })
 }
 
-fn parse_all(input: &Path, log: &mut impl Write) -> Result<()> {
+fn parse_all(input: &Path, output: &Path, log: &mut impl Write) -> Result<()> {
     for path in scan_files(input) {
         let path = path?;
         match path.extension().and_then(|e| e.to_str()) {
-            Some("ab") | Some("bin") => parse_bundle(&path, log)?,
+            Some("ab") | Some("bin") => parse_bundle(&path, output, log)?,
             _ => continue,
         }
     }
@@ -73,8 +73,15 @@ fn parse_all(input: &Path, log: &mut impl Write) -> Result<()> {
     Ok(())
 }
 
-fn parse_bundle(path: &Path, log: &mut impl Write) -> Result<()> {
-    if let Err(e) = UnityBundle::process(path) {
+fn parse_bundle(path: &Path, out_root: &Path, log: &mut impl Write) -> Result<()> {
+    let tmp_root = out_root.join(".tmp");
+    let relative = path
+        .parent()
+        .unwrap_or(&tmp_root)
+        .strip_prefix(&tmp_root)
+        .unwrap_or(Path::new(""));
+    let out_base = out_root.join(relative);
+    if let Err(e) = UnityBundle::process(path, &out_base) {
         writeln!(log, "{}", e)?;
         return Ok(());
     }

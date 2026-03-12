@@ -1,5 +1,7 @@
-use anyhow::Result;
-use std::io::{BufRead, Seek, SeekFrom};
+use anyhow::{Context, Result};
+use std::fs::{File, create_dir_all, write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 
 use crate::bundle::read::*;
 
@@ -21,7 +23,11 @@ pub struct Texture2D {
 }
 
 impl Texture2D {
-    pub fn parse(reader: &mut (impl BufRead + Seek), abs_offset: u64) -> Result<Self> {
+    pub fn parse(
+        (major, minor): (u32, u32),
+        reader: &mut (impl BufRead + Seek),
+        abs_offset: u64,
+    ) -> Result<Self> {
         reader.seek(SeekFrom::Start(abs_offset))?;
         let name_bytes = aligned_bytes(reader)?;
         let name = String::from_utf8(name_bytes)?;
@@ -42,6 +48,9 @@ impl Texture2D {
         let _is_readable = byte(reader)?;
         let _is_pre_processed = byte(reader)?;
         let _ignore_master_texture_limit = byte(reader)?;
+        if major > 2022 || (major == 2022 && minor >= 2) {
+            let _mipmap_limit_group_name = aligned_bytes(reader)?;
+        }
         let _streaming_mipmaps = byte(reader)?;
         align4(reader, 0)?;
         let _streaming_mipmaps_priority = i32_le(reader)?;
@@ -85,5 +94,27 @@ impl Texture2D {
             format: texture_format,
             image,
         })
+    }
+
+    pub fn extract(&self, dir: &Path, dec_path: &Path, ress_base: Option<u64>) -> Result<PathBuf> {
+        create_dir_all(dir)?;
+        let out_path = dir.join(&self.name);
+
+        match &self.image {
+            ImageData::Inline(data) => {
+                write(&out_path, data)?;
+            }
+            ImageData::Streaming { offset, size, .. } => {
+                let base =
+                    ress_base.with_context(|| format!("No .resS node for '{}'", &self.name))?;
+                let mut f = BufReader::new(File::open(dec_path)?);
+                f.seek(SeekFrom::Start(base + offset))?;
+                let mut data = vec![0u8; *size as usize];
+                f.read_exact(&mut data)?;
+                write(&out_path, &data)?;
+            }
+        }
+
+        Ok(out_path)
     }
 }
