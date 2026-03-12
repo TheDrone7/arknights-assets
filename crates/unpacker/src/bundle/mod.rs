@@ -57,7 +57,7 @@ impl UnityBundle {
         Ok(out)
     }
 
-    pub fn process(path: &Path) -> Result<()> {
+    pub fn process(path: &Path, out_base: &Path) -> Result<()> {
         let mut reader = BufReader::new(File::open(path)?);
         let bundle = Self::parse(&mut reader)
             .with_context(|| format!("SKIP [bad asset bundle] | [{}]", path.display(),))?;
@@ -93,7 +93,19 @@ impl UnityBundle {
         );
 
         let mut dec_reader = BufReader::new(File::open(&dec_path)?);
-        for sf in bundle.get_serialized(&mut dec_reader)? {
+        let serialized_files = bundle.get_serialized(&mut dec_reader)?;
+        let total_objects: usize = serialized_files.iter().map(|f| f.objects.len()).sum();
+        let bundle_stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("bundle");
+        let out_dir = if total_objects <= 1 {
+            out_base.to_path_buf()
+        } else {
+            out_base.join(bundle_stem)
+        };
+
+        for sf in &serialized_files {
             println!(
                 "  Serialized: [{}] (v{}; {} objects)",
                 sf.name,
@@ -136,6 +148,8 @@ impl UnityBundle {
                             text.name,
                             HumanBytes(text.data.len() as u64)
                         );
+                        let out_path = text.extract(&out_dir)?;
+                        println!("    Written to {:?}", out_path);
                     }
                     83 => {
                         let audio = AudioClip::parse(&mut dec_reader, abs).with_context(|| {

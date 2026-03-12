@@ -1,5 +1,7 @@
 use anyhow::Result;
+use std::fs::{create_dir_all, write};
 use std::io::{BufRead, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 
 use crate::bundle::read::*;
 
@@ -16,5 +18,12 @@ impl TextAsset {
         let data = aligned_bytes(reader)?;
 
         Ok(TextAsset { name, data })
+    }
+
+    pub fn extract(&self, dir: &Path) -> Result<PathBuf> {
+        create_dir_all(dir)?;
+        let out_path = dir.join(&self.name);
+        write(&out_path, &self.data)?;
+        Ok(out_path)
     }
 }
