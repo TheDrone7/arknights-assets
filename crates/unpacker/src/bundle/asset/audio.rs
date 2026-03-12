@@ -1,5 +1,7 @@
-use anyhow::Result;
-use std::io::{BufRead, Seek, SeekFrom};
+use anyhow::{Context, Result};
+use std::fs::{File, create_dir_all, write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 
 use crate::bundle::read::*;
 
@@ -66,5 +68,27 @@ impl AudioClip {
             compression_format,
             audio,
         })
+    }
+
+    pub fn extract(&self, dir: &Path, dec_path: &Path, ress_base: Option<u64>) -> Result<PathBuf> {
+        create_dir_all(dir)?;
+        let out_path = dir.join(&self.name);
+
+        match &self.audio {
+            AudioData::Inline(data) => {
+                write(&out_path, data)?;
+            }
+            AudioData::Streaming { offset, size, .. } => {
+                let base =
+                    ress_base.with_context(|| format!("No .resS node for '{}'", &self.name))?;
+                let mut f = BufReader::new(File::open(dec_path)?);
+                f.seek(SeekFrom::Start(base + offset))?;
+                let mut data = vec![0u8; *size as usize];
+                f.read_exact(&mut data)?;
+                write(&out_path, &data)?;
+            }
+        }
+
+        Ok(out_path)
     }
 }

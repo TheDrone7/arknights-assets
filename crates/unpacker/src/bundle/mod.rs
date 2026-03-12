@@ -11,7 +11,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
 use std::path::Path;
 
-use asset::{AudioClip, AudioData, ImageData, MonoBehaviour, Sprite, TextAsset, Texture2D};
+use asset::{AudioClip, AudioData, MonoBehaviour, Sprite, TextAsset, Texture2D};
 use block::BlockInfo;
 use header::BundleHeader;
 use serialized::SerializedFile;
@@ -76,7 +76,7 @@ impl UnityBundle {
             .truncate(true)
             .open(&dec_path)?;
         let mut dec_writer = BufWriter::new(dec_file);
-        let bytes_size = bundle
+        let _decompressed_size = bundle
             .decompress(&mut reader, &mut dec_writer)
             .with_context(|| {
                 format!(
@@ -86,12 +86,6 @@ impl UnityBundle {
                 )
             })?;
         dec_writer.flush()?;
-        println!(
-            "  Decompressed: [{}] ({})",
-            dec_path.display(),
-            HumanBytes(bytes_size as u64)
-        );
-
         let mut dec_reader = BufReader::new(File::open(&dec_path)?);
         let serialized_files = bundle.get_serialized(&mut dec_reader)?;
         let total_objects: usize = serialized_files.iter().map(|f| f.objects.len()).sum();
@@ -106,56 +100,43 @@ impl UnityBundle {
         };
 
         for sf in &serialized_files {
-            println!(
-                "  Serialized: [{}] (v{}; {} objects)",
-                sf.name,
-                sf.version,
-                sf.objects.len()
-            );
-
             for obj in &sf.objects {
                 let abs = sf.node_offset + (sf.data_offset + obj.byte_start) as u64;
                 match obj.class_id {
                     28 => {
-                        let texture =
+                        let _texture =
                             Texture2D::parse(&mut dec_reader, abs).with_context(|| {
                                 format!("Texture2D :: path_id = {}; abs = {}", obj.path_id, abs)
                             })?;
-                        match texture.image {
-                            ImageData::Inline(data) => {
-                                println!(
-                                    "    TEXTURE2D: [{}] ({}x{} | {})",
-                                    texture.name,
-                                    texture.width,
-                                    texture.height,
-                                    HumanBytes(data.len() as u64)
-                                );
-                            }
-                            ImageData::Streaming { path, offset, size } => {
-                                println!(
-                                    "    TEXTURE2D: [{}] ({}x{} | {}@{}+{})",
-                                    texture.name, texture.width, texture.height, path, offset, size
-                                );
-                            }
-                        }
+                        // match texture.image {
+                        //    ImageData::Inline(data) => {
+                        //        println!(
+                        //            "    TEXTURE2D: [{}] ({}x{} | {})",
+                        //            texture.name,
+                        //            texture.width,
+                        //            texture.height,
+                        //            HumanBytes(data.len() as u64)
+                        //        );
+                        //    }
+                        //    ImageData::Streaming { path, offset, size } => {
+                        //        println!(
+                        //            "    TEXTURE2D: [{}] ({}x{} | {}@{}+{})",
+                        //            texture.name, texture.width, texture.height, path, offset, size
+                        //        );
+                        //    }
+                        // }
                     }
                     49 => {
                         let text = TextAsset::parse(&mut dec_reader, abs).with_context(|| {
                             format!("TextAsset :: path_id = {}; abs = {}", obj.path_id, abs)
                         })?;
-                        println!(
-                            "    TEXT: [{}] ({})",
-                            text.name,
-                            HumanBytes(text.data.len() as u64)
-                        );
-                        let out_path = text.extract(&out_dir)?;
-                        println!("    Written to {:?}", out_path);
+                        text.extract(&out_dir)?;
                     }
                     83 => {
                         let audio = AudioClip::parse(&mut dec_reader, abs).with_context(|| {
                             format!("AudioClip :: path_id = {}; abs = {}", obj.path_id, abs)
                         })?;
-                        match audio.audio {
+                        match &audio.audio {
                             AudioData::Inline(data) => {
                                 println!(
                                     "    AUDIO: [{}] ({}ch; {}Hz; {}s | {})",
@@ -179,29 +160,41 @@ impl UnityBundle {
                                 );
                             }
                         }
+                        let ress_base = if let AudioData::Streaming { path: p, .. } = &audio.audio {
+                            let name = Path::new(&p)
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or(p.as_str());
+                            bundle
+                                .info
+                                .nodes
+                                .iter()
+                                .find(|n| n.name == name)
+                                .map(|n| n.offset)
+                        } else {
+                            None
+                        };
+                        audio
+                            .extract(&out_dir, &dec_path, ress_base)
+                            .with_context(|| format!("AudioClip::extract '{}'", audio.name))?;
                     }
                     114 => {
-                        let mono = MonoBehaviour::parse(&mut dec_reader, abs, obj.byte_size)
+                        let _mono = MonoBehaviour::parse(&mut dec_reader, abs, obj.byte_size)
                             .with_context(|| {
                                 format!(
                                     "MonoBehaviour :: path_id = {}; abs = {}; byte_size = {}",
                                     obj.path_id, abs, obj.byte_size
                                 )
                             })?;
-                        println!(
-                            "    MONO BEHAVIOUR: [{}] ({})",
-                            mono.name,
-                            HumanBytes(mono.data.len() as u64)
-                        );
                     }
                     213 => {
-                        let sprite = Sprite::parse(&mut dec_reader, abs).with_context(|| {
+                        let _sprite = Sprite::parse(&mut dec_reader, abs).with_context(|| {
                             format!("Sprite :: path_id = {}; abs = {}", obj.path_id, abs)
                         })?;
-                        println!(
-                            "    SPRITE: [{}] ({:?} + {:?} => {:?})",
-                            sprite.name, sprite.texture, sprite.alpha_texture, sprite.texture_rect
-                        );
+                        // println!(
+                        //     "    SPRITE: [{}] ({:?} + {:?} => {:?})",
+                        //     sprite.name, sprite.texture, sprite.alpha_texture, sprite.texture_rect
+                        // );
                     }
                     _ => {}
                 };
