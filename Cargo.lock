@@ -49,6 +49,7 @@ dependencies = [
  "anyhow",
  "indicatif",
  "lz4_flex",
+ "serde_json",
  "zip",
 ]
 
