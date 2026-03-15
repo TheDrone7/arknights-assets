@@ -1,6 +1,7 @@
 mod block;
 mod header;
 mod serialized;
+mod typetree;
 
 pub mod asset;
 pub mod read;
@@ -98,6 +99,8 @@ impl UnityBundle {
             out_base.join(bundle_stem)
         };
 
+        let mut i = 0;
+
         for sf in &serialized_files {
             for obj in &sf.objects {
                 let abs = sf.node_offset + (sf.data_offset + obj.byte_start) as u64;
@@ -156,13 +159,17 @@ impl UnityBundle {
                             .with_context(|| format!("AudioClip::extract '{}'", audio.name))?;
                     }
                     114 => {
-                        let _mono = MonoBehaviour::parse(&mut dec_reader, abs, obj.byte_size)
+                        let nodes = sf.type_nodes(obj.type_id);
+                        let mono = MonoBehaviour::parse(nodes, &mut dec_reader, abs, obj.byte_size)
                             .with_context(|| {
                                 format!(
                                     "MonoBehaviour :: path_id = {}; abs = {}; byte_size = {}",
                                     obj.path_id, abs, obj.byte_size
                                 )
                             })?;
+                        mono.extract(&out_dir, i).with_context(|| {
+                            format!("MonoBehaviour::extract '{}' ({})", mono.name, i)
+                        })?;
                     }
                     213 => {
                         let _sprite = Sprite::parse(&mut dec_reader, abs).with_context(|| {
@@ -175,10 +182,10 @@ impl UnityBundle {
                     }
                     _ => {}
                 };
+                i += 1;
             }
         }
 
-        println!("\n");
         Ok(())
     }
 }

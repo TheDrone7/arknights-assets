@@ -92,6 +92,12 @@ pub fn f32_le(reader: &mut impl BufRead) -> Result<f32> {
     Ok(f32::from_le_bytes(buf))
 }
 
+pub fn f64_le(reader: &mut impl BufRead) -> Result<f64> {
+    let mut buf = [0u8; 8];
+    reader.read_exact(&mut buf)?;
+    Ok(f64::from_le_bytes(buf))
+}
+
 pub fn align4(reader: &mut (impl BufRead + Seek), base: u64) -> Result<()> {
     let pos = reader.stream_position()? - base;
     let aligned = (pos + 3) & !3;
